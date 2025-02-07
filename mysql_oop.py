@@ -6,13 +6,14 @@ class startup():
     def __init__(self):
         
         self.clear_screen = lambda: os.system('cls')
+        self.clear_screen()
 
-        #password = input("Enter the database password: ")          #Disabled for debugging purposes
+        password = input("Enter the database password: ")          #Disabled for debugging purposes
 
         self.connection = mysql.connector.connect(
             host = "localhost",
             user = "root",
-            password = "C0ventryCUC",
+            password = password,
             auth_plugin = "mysql_native_password"
 
         )
@@ -25,6 +26,14 @@ class startup():
             print("Connected to MySQL database")
 
         self.cursor = self.connection.cursor(buffered=True) #buffered=True allows multiple queries to be executed at once.
+
+        #nuking the database for debugging purposes
+        if input("Do you want to nuke the database? (y/n): ") == 'y':
+            self.cursor.execute("DROP DATABASE IF EXISTS school")
+            self.connection.commit()
+            print("Database nuked successfully")
+        else:
+            pass
 
         self.cursor.execute("CREATE DATABASE IF NOT EXISTS school")
         self.cursor.execute("use school")
@@ -41,19 +50,33 @@ class startup():
             subject VARCHAR(255) UNIQUE
             )""")
         
+        # Inserting subjects into the subjects table
+        self.cursor.execute("SELECT subject FROM subjects")
+        subjects = self.cursor.fetchall()
+        if not subjects:
+            subjects = ["Mathematics", "Physics", "Chemistry", "Biology", "Computer Science", "History", "Geography"]
+            for subject in subjects:
+                self.cursor.execute("INSERT INTO subjects (subject) VALUES (%s)", (subject,))
+                self.connection.commit()
+            #print("Subjects inserted successfully")                             #Debugging print
+        else:
+            pass
+            #print(subjects)                                                     #Debugging print
+        
         self.cursor.execute("""create table if not exists teachers
             (id INTEGER PRIMARY KEY,
             teacher_id INTEGER,
             subject VARCHAR(255),
-            FOREIGN KEY(teacher_id) REFERENCES users(id)
+            FOREIGN KEY(teacher_id) REFERENCES users(id),
+            FOREIGN KEY(subject) REFERENCES subjects(subject)
             )""")
         
         self.cursor.execute("""create table if not exists students
-            (id INTEGER PRIMARY KEY,
+            (id INTEGER PRIMARY KEY AUTO_INCREMENT,
             student_id INTEGER,
-            lessons VARCHAR(255),
+            subject VARCHAR(255),
             FOREIGN KEY(student_id) REFERENCES users(id),
-            FOREIGN KEY(lessons) REFERENCES subjects(subject)
+            FOREIGN KEY(subject) REFERENCES subjects(subject)
             )""")  
          
 
@@ -94,19 +117,6 @@ class startup():
         else:
             #print("Admin account already exists")                          Debugging print
             pass
-
-        # Inserting subjects into the subjects table
-        self.cursor.execute("SELECT subject FROM subjects")
-        subjects = self.cursor.fetchall()
-        if not subjects:
-            subjects = ["Mathematics", "Physics", "Chemistry", "Biology", "Computer Science", "History", "Geography"]
-            for subject in subjects:
-                self.cursor.execute("INSERT INTO subjects (subject) VALUES (%s)", (subject,))
-                self.connection.commit()
-            #print("Subjects inserted successfully")                             #Debugging print
-        else:
-            pass
-            #print(subjects)                                                     #Debugging print
 
         self.login()
 
@@ -197,24 +207,28 @@ class admin(database):
             student_id = self.cursor.fetchone()[0]
             data = self.cursor.execute("SELECT subject FROM subjects")
             subjects = self.cursor.fetchall()
-            print(subjects)
+            #print(subjects)                                                #Debugging print
             x = 0
             subjects_list = []
+            #print(len(subjects))                                            #Debugging print
             for x in range(len(subjects)):
-                subjects_list = subjects_list.append(subjects[x])
+                subjects_list.append(subjects[x])
+                #print(subjects_list)                                        #Debugging print
             choosing = True
             while choosing == True:
                 x = 0
                 print("Available subjects: ")
-                for subject in subjects:
-                    print(x, subjects_list[0])
+                for x in range(len(subjects_list)):
+                    print(x+1,":",subjects_list[x])
                     x += 1
-                student_subject = input("Enter the subjects you want to learn: ")
-                student_subject = subjects[int(student_subject)]
-                data = self.cursor.execute("insert into student (id, subject) values (%s, %s)", (student_id, student_subject))
+                student_subject_num = int(input("Enter the subjects you want to learn: "))-1
+                student_subject = str(subjects_list[student_subject_num])
+                student_subject = student_subject.replace("(", "").replace(")", "").replace(",", "").replace("'", "")
+                #print(student_subject)                                      #Debugging print
+                data = self.cursor.execute("insert into students (student_id, subject) values (%s, %s)", (student_id, student_subject))
                 self.connection.commit()
-                subjects.pop(int(student_subject))
-                if len(subjects) == 0:
+                subjects_list.pop(student_subject_num)
+                if len(subjects_list) == 0:
                     print("No more subjects available.")
                     choosing = False
                 if input("Do you want to add more subjects? (y/n): ") == 'n':
