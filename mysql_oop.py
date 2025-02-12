@@ -1,15 +1,34 @@
 import mysql.connector
+"""
+This module provides an object-oriented interface to interact with a MySQL database for a school management system.
+It includes classes for startup, database operations, and user roles (admin, teacher, student).
+Classes:
+    startup: Initializes the database connection, creates necessary tables, and inserts initial data.
+    database: Inherits from startup and provides methods for user login and closing the database connection.
+    student: Inherits from database and provides methods specific to student operations.
+    teacher: Inherits from database and provides methods specific to teacher operations.
+    admin: Inherits from database and provides methods for admin operations such as adding, updating, fetching, and deleting users.
+Functions:
+    __init__: Initializes the class instance and sets up the database connection.
+    close: Closes the database connection.
+    login: Handles user login and role-based access.
+    add_user: Adds a new user to the database.
+    update_user: Updates an existing user's information in the database.
+    fetch_users: Fetches user information from the database.
+    delete_user: Deletes a user from the database.
+    menu: Displays the admin menu and handles user choices.
+"""
 import bcrypt
 import os
 
 class startup():
     def __init__(self):
         
-        self.clear_screen = lambda: os.system('cls')
+        #clear_screen = lambda: os.system('cls')
         password = input("Enter the database password: ")          #Disabled for debugging purposes
 
         try:
-            self.clear_screen()
+            clear_screen()
             self.connection = mysql.connector.connect(
                 host = "localhost",
                 user = "root",
@@ -119,24 +138,32 @@ class startup():
             #print("Admin account already exists")                          Debugging print
             pass
 
-        self.login()
+        self.start_menu()
 
 class database(startup):
     
     def __init__(self):
         super().__init__()
-        self.clear_screen = clear_screen
-
     def close(self):
         self.connection.close()
         print("Connection closed")
+
+    def start_menu(self):
+        choice = input(f"1. Login\n2. Close\n")
+        if choice == "1":
+            self.login()
+        elif choice == "2":
+            self.close()
+        else:
+            print("Invalid choice, please try again")
+            self.start_menu()
 
     def login(self):
         email = input("Enter your email: ")
         password = input("Enter your password: ")
 
         # Fetch the stored hashed password and role
-        query = "SELECT password, role FROM school.users WHERE email = %s"
+        query = "SELECT password, role FROM users WHERE email = %s"
         self.cursor.execute(query, (email,))
         result = self.cursor.fetchone()
 
@@ -149,24 +176,24 @@ class database(startup):
 
                 # User role checks
                 if user_role == "admin":
-                    self.clear_screen()
-                    admin(self.cursor, self.connection, self.clear_screen).menu()
+                    clear_screen()
+                    admin(self.cursor, self.connection).menu()
                 elif user_role == "student":
-                    self.clear_screen()
+                    clear_screen()
                     print("Student logged in.")
                     student(self.cursor, self.connection, email).menu()
                 elif user_role == "teacher":
-                    self.clear_screen()
+                    clear_screen()
                     print("Teacher logged in.")
-                    teacher(self.cursor, self.connection).menu()  # If teacher class exists
+                    teacher(self.cursor, self.connection, email).menu()
                 else:
                     print("Access role unknown: Contact your administrator")
             else:
                 print("Invalid credentials.")
-                self.login()
+                self.start_menu()
         else:
             print("User not found.")
-            self.login()
+            self.start_menu()
 
 
 class student(database):
@@ -183,29 +210,86 @@ class student(database):
         #for id, name, role, email, password in Student_Info[0]:                                    Alternate method
         #    print(f"Your Student ID is: {id}\nYour name is: {name}\nYour email is: {email}")
         id_list = [id]
-        self.cursor.execute("SELECT Subject FROM students WHERE student_id = %s", (id_list))
+        self.cursor.execute("SELECT Subject FROM students WHERE uni_id = %s", (id_list))
         Subject_Info = self.cursor.fetchall()
+        cleaned_subjects = [str(subject).replace("(", "").replace(")", "").replace(",", "").replace("'", "") for subject in Subject_Info]
         print("You are studying:")
-        for subject in Subject_Info:
+        for subject in cleaned_subjects:
             print(subject)
+        
+    def menu(self):
+        choice = input(f"1. Change password\n2. Logout\n")
+        if choice == "1":
+            self.password_change()
+        elif choice == "2":
+            self.start_menu()
+        else:
+            print("Invalid choice")
+            self.menu()
+        
+
+    def password_change(self):
+        current_password = input("Please enter your current password:")
+        clear_screen()
+        new_password_1 = input("Please enter your new password:")
+        clear_screen()
+        new_password_2 = input("Please input your new password again:")
+
+        self.cursor.execute("SELECT password FROM users WHERE email = %s", (self.email))
+        stored_hashed_password = str(self.cursor.fetchone()).replace("(", "").replace(")", "").replace(",", "").replace("'", "")
+        print(stored_hashed_password)
+
+        if bcrypt.checkpw(current_password.encode(), stored_hashed_password.decode()):
+            if new_password_1 == new_password_2:
+                new_password_1 = bcrypt.hashpw(new_password_1.encode(), bcrypt.gensalt()).decode()
+                self.cursor.execute("UPDATE users SET password = %s WHERE email = %s", (new_password_1, self.email))
+                self.connection.commit()
+                print("Password updated")
+                self.menu()
+            else:
+                print("Passwords do not match, please try again")
+                self.menu()
+        else:
+            print("Invalid credentials, please try again")
+            self.menu()
+
+            
+
+
+class teacher(database):
+    def __init__(self, cursor, connection, email):
+        self.cursor = cursor
+        self.connection = connection
+        self.email = [email]
+        self.list_students()
+
+    def list_students(self):
+        #print(self.email)                                                                     #Debug print
+        self.cursor.execute("SELECT uni_id FROM users WHERE email = %s", (self.email))
+        teacher_id = self.cursor.fetchone()
+        print(teacher_id)                                                                      #Debug print
+        self.cursor.execute("SELECT subject FROM teachers WHERE uni_id = %s", (teacher_id))
+        subject = self.cursor.fetchone()
+        print(subject)                                                                         #Debug print    
+        self.cursor.execute("SELECT uni_id FROM students WHERE subject = %s", (subject))
+        students_id = self.cursor.fetchall()
+        print(students_id)                                                                     #Debug print
+        self.cursor.execute("SELECT name FROM users WHERE uni_id = %s", (students_id))
+        students = self.cursor.fetchall()
+        print(students)                                                                        #Debug print
+        print("You're teaching the following students:")
+        for student in students:
+            print(student)
+        
         
 
 
 
-    def password_change(self):
-        change_password = input("Do you want to change your password?")
 
-
-class teacher(database):
+class admin(database):
     def __init__(self, cursor, connection):
         self.cursor = cursor
         self.connection = connection
-
-class admin(database):
-    def __init__(self, cursor, connection, clear_screen):
-        self.cursor = cursor
-        self.connection = connection
-        self.clear_screen = clear_screen()
 
     def add_user(self):
         # Inserting data into the database
@@ -231,7 +315,7 @@ class admin(database):
 
         elif user_role == "student":
             data = self.cursor.execute("SELECT uni_id FROM users WHERE name = %s", (user_name,))
-            student_id = self.cursor.fetchone()[0]
+            uni_id = self.cursor.fetchone()[0]
             data = self.cursor.execute("SELECT subject FROM subjects")
             subjects = self.cursor.fetchall()
             #print(subjects)                                                #Debugging print
@@ -277,7 +361,7 @@ class admin(database):
         #print(user_email)                                                                  #Debug print
         self.cursor.execute("UPDATE users SET email = %s WHERE name = %s", (user_email, user_name))
         self.connection.commit()
-        self.clear_screen()
+        clear_screen()
         print("Your email is:" ,user_email)
         
 
@@ -326,7 +410,7 @@ class admin(database):
         self.menu()
 
     def menu(self):
-        print("1. Add User\n2. Fetch Users\n3. Delete Users\n4. Update Users\n5. Exit")
+        print("1. Add User\n2. Fetch Users\n3. Delete Users\n4. Update Users\n5. Logout")
         choice = input("Enter your choice: ")
         if choice == '1':
             self.add_user()
@@ -337,10 +421,9 @@ class admin(database):
         elif choice == '4':
             self.update_user()
         elif choice == '5':
-            print("Exiting...")
-            self.connection.close()
-            print("Connection closed")
-            exit()
+            clear_screen()
+            print("Logged out successfully.")
+            self.start_menu()
         else:
             print("Invalid choice, please try again.")
             self.menu()
@@ -350,7 +433,7 @@ class admin(database):
 
 if __name__ == "__main__":
     clear_screen = lambda: os.system("cls")
-    database(clear_screen)
+    database()
 
 
 
