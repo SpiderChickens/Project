@@ -48,12 +48,12 @@ class startup():
         self.cursor = self.connection.cursor(buffered=True) #buffered=True allows multiple queries to be executed at once and prevent cursor errors.
 
         #nuking the database for debugging purposes
-        #if input("Do you want to nuke the database? (y/n): ") == 'y':
-        #    self.cursor.execute("DROP DATABASE IF EXISTS school")
-        #    self.connection.commit()
-        #    print("Database nuked successfully")
-        #else:
-        #    pass
+        if input("Do you want to nuke the database? (y/n): ") == 'y':
+            self.cursor.execute("DROP DATABASE IF EXISTS school")
+            self.connection.commit()
+            print("Database nuked successfully")
+        else:
+            pass
 
         self.cursor.execute("CREATE DATABASE IF NOT EXISTS school")
         self.cursor.execute("use school")
@@ -74,7 +74,7 @@ class startup():
         self.cursor.execute("SELECT subject FROM subjects")
         subjects = self.cursor.fetchall()
         if not subjects:
-            subjects = ["Mathematics", "Physics", "Chemistry", "Biology", "Computer Science", "History", "Geography"]
+            subjects = ["Mathematics", "Physics", "Chemistry", "Biology", "Computer Science", "History", "Geography", "English", "French", "Engineering"]
             for subject in subjects:
                 self.cursor.execute("INSERT INTO subjects (subject) VALUES (%s)", (subject,))
                 self.connection.commit()
@@ -270,10 +270,6 @@ class student(database):
             print("Invalid choice")
             self.menu()
         
-
-            
-
-
 class teacher(database):
     def __init__(self, cursor, connection, email):
         self.cursor = cursor
@@ -290,13 +286,18 @@ class teacher(database):
         #print(subject)                                                                         #Debug print    
         self.cursor.execute("SELECT uni_id FROM students WHERE subject = %s", (subject))
         students_id = self.cursor.fetchall()
-        #print(students_id)                                                                     #Debug print
-        self.cursor.execute("SELECT name FROM users WHERE uni_id = %s", (students_id[0]))
-        students = self.cursor.fetchall()
+        #print(type(students_id))  
+        name_list = []                                                                   #Debug print
+        for id in students_id:
+            self.cursor.execute("SELECT name FROM users WHERE uni_id = %s", (id))
+            students = self.cursor.fetchone()
+            #print(students)
+            name_list.append(students)
         #print(students)                                                                        #Debug print
         print("You're teaching the following students:")
-        for student in students:
-            print(student)
+        for name in name_list:
+            print(name)
+        self.menu()
         
     def menu(self):
         choice = input(f"1. List students\n2. Change Password\n3. Change student password\n4. Logout")
@@ -411,7 +412,7 @@ class admin(database):
         user_role = input("Enter your access role: ")
         user_password = input("Enter your password: ")
         user_password = bcrypt.hashpw(user_password.encode(), bcrypt.gensalt()).decode()
-        data = (user_name, user_email, user_role, user_id, user_password)
+        data = (user_name, user_email, user_role, user_password, user_id)
         self.cursor.execute(update_query, data)
 
         # Commit the changes
@@ -428,6 +429,8 @@ class admin(database):
         rows = self.cursor.fetchall()
         for row in rows:
             print(row)
+        
+        self.menu()
 
     def delete_user(self):
         user_id = input("Enter the id of the user you want to delete: ")
@@ -447,6 +450,7 @@ class admin(database):
     def menu(self):
         print("1. Add User\n2. Fetch Users\n3. Delete Users\n4. Update Users\n5. Logout")
         choice = input("Enter your choice: ")
+        clear_screen()
         if choice == '1':
             self.add_user()
         elif choice == '2':
