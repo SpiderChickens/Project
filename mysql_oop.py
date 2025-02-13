@@ -48,12 +48,12 @@ class startup():
         self.cursor = self.connection.cursor(buffered=True) #buffered=True allows multiple queries to be executed at once and prevent cursor errors.
 
         #nuking the database for debugging purposes
-        if input("Do you want to nuke the database? (y/n): ") == 'y':
-            self.cursor.execute("DROP DATABASE IF EXISTS school")
-            self.connection.commit()
-            print("Database nuked successfully")
-        else:
-            pass
+        #if input("Do you want to nuke the database? (y/n): ") == 'y':
+        #    self.cursor.execute("DROP DATABASE IF EXISTS school")
+        #    self.connection.commit()
+        #    print("Database nuked successfully")
+        #else:
+        #    pass
 
         self.cursor.execute("CREATE DATABASE IF NOT EXISTS school")
         self.cursor.execute("use school")
@@ -137,24 +137,63 @@ class startup():
         else:
             #print("Admin account already exists")                          Debugging print
             pass
+        
+        clear_screen()
 
         self.start_menu()
 
 class database(startup):
+
+    def password_change(self, email, higher_access):
+        email_local = email
+        #print(email_local)                                                                    #Debug print
+        higher_access = higher_access
+        #self.cursor.execute("SELECT role FROM users WHERE email = %s", (email_local))
+        #role = self.cursor.fetchone()
+
+        if higher_access == False:
+            current_password = input("Please enter your current password:")
+            clear_screen()
+        else:
+            current_password = ""
+        new_password_1 = input("Please enter your new password:")
+        clear_screen()
+        new_password_2 = input("Please input your new password again:")
+
+        self.cursor.execute("SELECT password FROM users WHERE email = %s", (email_local))
+        stored_hashed_password = str(self.cursor.fetchone()).replace("(", "").replace(")", "").replace(",", "").replace("'", "")
+        #print(stored_hashed_password)                                                         #Debug print
+
+        if bcrypt.checkpw(current_password.encode(), stored_hashed_password.encode()) or higher_access == True:
+            if new_password_1 == new_password_2:
+                new_password_1 = bcrypt.hashpw(new_password_1.encode(), bcrypt.gensalt()).decode()
+                self.cursor.execute("UPDATE users SET password = %s WHERE email = %s", (new_password_1, email_local[0]))
+                self.connection.commit()
+                print("Password updated")
+                self.menu()
+            else:
+                print("Passwords do not match, please try again")
+                self.menu()
+        else:
+            print("Invalid credentials, please try again")
+            self.menu()
     
     def __init__(self):
         super().__init__()
     def close(self):
         self.connection.close()
         print("Connection closed")
+        exit()
 
     def start_menu(self):
         choice = input(f"1. Login\n2. Close\n")
         if choice == "1":
+            clear_screen()
             self.login()
         elif choice == "2":
             self.close()
         else:
+            clear_screen()
             print("Invalid choice, please try again")
             self.start_menu()
 
@@ -171,6 +210,7 @@ class database(startup):
             stored_hashed_password, user_role = result
 
             # Check the password
+            #print(type(stored_hashed_password))                                               #Debug print
             if bcrypt.checkpw(password.encode(), stored_hashed_password.encode()):
                 print("Login successful!")
 
@@ -216,42 +256,20 @@ class student(database):
         print("You are studying:")
         for subject in cleaned_subjects:
             print(subject)
+        self.menu()
         
     def menu(self):
         choice = input(f"1. Change password\n2. Logout\n")
         if choice == "1":
-            self.password_change()
+            higher_access = False
+            self.password_change(self.email, higher_access)
         elif choice == "2":
+            clear_screen()
             self.start_menu()
         else:
             print("Invalid choice")
             self.menu()
         
-
-    def password_change(self):
-        current_password = input("Please enter your current password:")
-        clear_screen()
-        new_password_1 = input("Please enter your new password:")
-        clear_screen()
-        new_password_2 = input("Please input your new password again:")
-
-        self.cursor.execute("SELECT password FROM users WHERE email = %s", (self.email))
-        stored_hashed_password = str(self.cursor.fetchone()).replace("(", "").replace(")", "").replace(",", "").replace("'", "")
-        print(stored_hashed_password)
-
-        if bcrypt.checkpw(current_password.encode(), stored_hashed_password.decode()):
-            if new_password_1 == new_password_2:
-                new_password_1 = bcrypt.hashpw(new_password_1.encode(), bcrypt.gensalt()).decode()
-                self.cursor.execute("UPDATE users SET password = %s WHERE email = %s", (new_password_1, self.email))
-                self.connection.commit()
-                print("Password updated")
-                self.menu()
-            else:
-                print("Passwords do not match, please try again")
-                self.menu()
-        else:
-            print("Invalid credentials, please try again")
-            self.menu()
 
             
 
@@ -261,27 +279,44 @@ class teacher(database):
         self.cursor = cursor
         self.connection = connection
         self.email = [email]
-        self.list_students()
 
     def list_students(self):
         #print(self.email)                                                                     #Debug print
         self.cursor.execute("SELECT uni_id FROM users WHERE email = %s", (self.email))
         teacher_id = self.cursor.fetchone()
-        print(teacher_id)                                                                      #Debug print
+        #print(teacher_id)                                                                      #Debug print
         self.cursor.execute("SELECT subject FROM teachers WHERE uni_id = %s", (teacher_id))
         subject = self.cursor.fetchone()
-        print(subject)                                                                         #Debug print    
+        #print(subject)                                                                         #Debug print    
         self.cursor.execute("SELECT uni_id FROM students WHERE subject = %s", (subject))
         students_id = self.cursor.fetchall()
-        print(students_id)                                                                     #Debug print
-        self.cursor.execute("SELECT name FROM users WHERE uni_id = %s", (students_id))
+        #print(students_id)                                                                     #Debug print
+        self.cursor.execute("SELECT name FROM users WHERE uni_id = %s", (students_id[0]))
         students = self.cursor.fetchall()
-        print(students)                                                                        #Debug print
+        #print(students)                                                                        #Debug print
         print("You're teaching the following students:")
         for student in students:
             print(student)
         
-        
+    def menu(self):
+        choice = input(f"1. List students\n2. Change Password\n3. Change student password\n4. Logout")
+        if choice == "1":
+            clear_screen()
+            self.list_students()
+        elif choice == "2":
+            higher_access = False
+            self.password_change(self.email, higher_access)
+        elif choice == "3":
+            student_email = [input("Enter the students email:")]
+            higher_access = True
+            self.password_change(student_email, higher_access)
+        elif choice == "4":
+            clear_screen()
+            self.start_menu()
+        else:
+            clear_screen()
+            print("Invalid input, pease try again")
+            self.menu()
 
 
 
