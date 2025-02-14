@@ -20,6 +20,8 @@ Functions:
 """
 import bcrypt
 import os
+import sys
+import subprocess
 
 class startup():
     def __init__(self):
@@ -52,6 +54,12 @@ class startup():
             self.cursor.execute("DROP DATABASE IF EXISTS school")
             self.connection.commit()
             print("Database nuked successfully")
+            try:
+                os.remove("school_data.csv")
+            except:
+                pass
+            else:
+                pass
         else:
             pass
 
@@ -139,6 +147,23 @@ class startup():
             pass
         
         clear_screen()
+
+        if not os.path.isfile("school_data.csv"):
+            print("List of fake people missing. Creating and inserting into database...")
+            try:
+                print("Generating fake people...")
+                subprocess.run(["python", "generate_people.py"], check=True)
+                print("Fake people generated successfully, Inserting into database...")
+                subprocess.run(["python", "importing_people.py"], check=True)
+                print("Fake people inserted into database successfully...")
+            except subprocess.CalledProcessError:
+                print("Failed to generate or insert fake people, exiting...")
+                self.connection.close()
+                sys.exit()
+        else:
+            pass
+
+
 
         self.start_menu()
 
@@ -275,6 +300,16 @@ class teacher(database):
         self.cursor = cursor
         self.connection = connection
         self.email = [email]
+        self.cursor.execute("SELECT * FROM USERS WHERE email = %s", self.email)
+        teacher_Info = self.cursor.fetchall()
+        id, name, role, email, hashedpassword = teacher_Info[0]
+        print(f"Your ID number is: {id}\nYour name is: {name}\nYour email is: {email}")
+        id_list = [id]
+        self.cursor.execute("SELECT Subject FROM teachers WHERE uni_id = %s", (id_list))
+        Subject_Info = self.cursor.fetchall()
+        cleaned_subjects = [str(subject).replace("(", "").replace(")", "").replace(",", "").replace("'", "") for subject in Subject_Info]
+        print(f"You are teaching {cleaned_subjects[0]}")
+        self.menu()
 
     def list_students(self):
         #print(self.email)                                                                     #Debug print
