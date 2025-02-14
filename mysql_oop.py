@@ -23,6 +23,8 @@ import os
 import sys
 import subprocess
 
+subprocess.check_call([sys.executable, "-m", "pip", "install", "faker"])
+
 class startup():
     def __init__(self):
         
@@ -55,11 +57,12 @@ class startup():
             self.connection.commit()
             print("Database nuked successfully")
             try:
+                print("Deleting fake people file...")
                 os.remove("school_data.csv")
             except:
                 pass
             else:
-                pass
+                print("Fake people file deleted successfully")
         else:
             pass
 
@@ -335,7 +338,7 @@ class teacher(database):
         self.menu()
         
     def menu(self):
-        choice = input(f"1. List students\n2. Change Password\n3. Change student password\n4. Logout")
+        choice = input(f"1. List students\n2. Change Password\n3. Change student password\n4. Logout\n")
         if choice == "1":
             clear_screen()
             self.list_students()
